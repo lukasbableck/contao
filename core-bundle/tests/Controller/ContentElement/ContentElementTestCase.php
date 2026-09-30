@@ -117,7 +117,7 @@ abstract class ContentElementTestCase extends TestCase
      *
      * @param-out array $responseContextData
      */
-    protected function renderWithModelData(AbstractContentElementController $controller, array $modelData, string|null $template = null, bool $asEditorView = false, array|null &$responseContextData = null, ContainerBuilder|null $adjustedContainer = null, array $nestedFragments = []): Response
+    protected function renderWithModelData(AbstractContentElementController $controller, array $modelData, string|null $template = null, bool $asEditorView = false, array|null &$responseContextData = null, ContainerBuilder|null $adjustedContainer = null, array $nestedFragments = [], Request|null $request = null): Response
     {
         $framework = $this->getDefaultFramework($nestedFragments);
 
@@ -193,7 +193,7 @@ abstract class ContentElementTestCase extends TestCase
             'type' => $modelData['type'],
         ]);
 
-        $request = new Request();
+        $request ??= new Request();
         $request->attributes->set('nestedFragments', $nestedFragments);
 
         $response = $controller($request, $model, 'main');
@@ -306,7 +306,7 @@ abstract class ContentElementTestCase extends TestCase
 
         // Runtime loaders
         $insertTagParser = $this->getDefaultInsertTagParser();
-        $responseContextAccessor = $this->createMock(ResponseContextAccessor::class);
+        $responseContextAccessor = $this->getResponseContextAccessor();
 
         $environment->addRuntimeLoader(
             new FactoryRuntimeLoader([
@@ -323,6 +323,11 @@ abstract class ContentElementTestCase extends TestCase
         $environment->enableStrictVariables();
 
         return $environment;
+    }
+
+    protected function getResponseContextAccessor(): ResponseContextAccessor
+    {
+        return $this->createStub(ResponseContextAccessor::class);
     }
 
     protected function getDefaultStorage(): VirtualFilesystem

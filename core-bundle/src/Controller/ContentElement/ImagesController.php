@@ -20,8 +20,12 @@ use Contao\CoreBundle\Filesystem\SortMode;
 use Contao\CoreBundle\Filesystem\VirtualFilesystem;
 use Contao\CoreBundle\Image\Studio\Figure;
 use Contao\CoreBundle\Image\Studio\Studio;
+use Contao\CoreBundle\Routing\ResponseContext\JsonLd\JsonLdManager;
+use Contao\CoreBundle\Routing\ResponseContext\ResponseContextAccessor;
+use Contao\CoreBundle\String\HtmlDecoder;
 use Contao\CoreBundle\Twig\FragmentTemplate;
 use Contao\FrontendUser;
+use Contao\StringUtil;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -35,6 +39,8 @@ class ImagesController extends AbstractContentElementController
         private readonly VirtualFilesystem $filesStorage,
         private readonly Studio $studio,
         private readonly array $validExtensions,
+        private readonly ResponseContextAccessor|null $responseContextAccessor = null,
+        private readonly HtmlDecoder|null $htmlDecoder = null,
     ) {
     }
 
@@ -88,7 +94,44 @@ class ImagesController extends AbstractContentElementController
         $template->set('items_per_page', $model->perPage ?: null);
         $template->set('items_per_row', $model->perRow ?: null);
 
-        return $template->getResponse();
+        $response = $template->getResponse();
+
+        if ('gallery' === $model->type) {
+            $this->addGallerySchema($model, $request, $imageList);
+        }
+
+        return $response;
+    }
+
+    /**
+     * @param array<Figure> $images
+     */
+    private function addGallerySchema(ContentModel $model, Request $request, array $images): void
+    {
+        $responseContext = $this->responseContextAccessor?->getResponseContext();
+
+        if (!$responseContext?->has(JsonLdManager::class) || !$this->htmlDecoder) {
+            return;
+        }
+
+        $jsonLdManager = $responseContext->get(JsonLdManager::class);
+        $graph = $jsonLdManager->getGraphForSchema(JsonLdManager::SCHEMA_ORG);
+        $galleryImages = [];
+
+        foreach ($images as $image) {
+            $galleryImages[] = ['@id' => $image->getSchemaOrgData()['identifier']];
+        }
+
+        $headline = StringUtil::deserialize($model->headline ?: '', true);
+        $gallery = $jsonLdManager->createSchemaOrgTypeFromArray(array_filter([
+            '@type' => 'ImageGallery',
+            'name' => $this->htmlDecoder->htmlToPlainText($headline['value'] ?? ''),
+            'url' => $request->getUri(),
+            'associatedMedia' => $galleryImages,
+        ]));
+        $gallery->setProperty('@id', '#/schema/gallery/'.$model->id);
+
+        $graph->set($gallery, '#/schema/gallery/'.$model->id);
     }
 
     /**

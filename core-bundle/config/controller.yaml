@@ -96,6 +96,8 @@ services:
             - '@contao.filesystem.virtual.files'
             - '@contao.image.studio'
             - '%contao.image.valid_extensions%'
+            - '@contao.routing.response_context_accessor'
+            - '@contao.string.html_decoder'
 
     Contao\CoreBundle\Controller\ContentElement\ListController: ~
 
